@@ -183,6 +183,22 @@ describe('serializer', () => {
       expect(deStates[2].toBoolean()).to.equal(states[2])
     })
 
+    it('Script Object', () => {
+      const states = [11, '1234', false]
+      const serial = serializeState(states)
+      const script = Script.fromASM('OP_TRUE OP_RETURN ' + serial)
+      const hex = script.toHex()
+      expect(serial).to.equal('0b 1234 0 0600')
+      expect(hex).to.equal('516a010b02123400020600')
+
+      //script object
+      const deStates = deserializeState(script)
+      expect(deStates.length).to.equal(3)
+      expect(deStates[0].toNumber()).to.equal(states[0])
+      expect(deStates[1].toHex()).to.equal(states[1])
+      expect(deStates[2].toBoolean()).to.equal(states[2])
+    })
+
     it('special number', () => {
       const states = [0, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
       const serial = serializeState(states)

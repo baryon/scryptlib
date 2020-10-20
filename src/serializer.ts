@@ -104,14 +104,15 @@ class OpState {
 
 export type OpStateArray = Array<OpState>
 
-// deserialize Script Hex to contract state array
+// deserialize Script or Script Hex to contract state array
 // DONT support ASM Code converting.
 // TODO: validate
-export function deserializeState(hex: string): OpStateArray {
-  const script = new Script(hex)
+export function deserializeState(s: string | bsv.Script): OpStateArray {
+  const script = new Script(s)
   const chunks = script.chunks
   const states = []
   let pos = chunks.length
+  //the last opcode is length of stats, skip
   for (let i = pos - 2; i >= 0; i--) {
     const opcodenum = chunks[i].opcodenum
     if (opcodenum === Opcode.OP_RETURN) {
