@@ -18,6 +18,9 @@ describe('utils', () => {
       expect(num2bin(0x123456789abcde, 10)).to.equal('debc9a78563412000000')
       expect(num2bin(-1000, 4)).to.equal('e8030080')
       expect(num2bin(-123456789, 8)).to.equal('15cd5b0700000080')
+
+      expect(num2bin(0, 32)).to.equal('00'.repeat(32))
+      expect(num2bin(0n, 32)).to.equal('00')
     })
 
     it('should raise error if the number can not fit in certain bytes length', () => {
