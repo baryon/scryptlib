@@ -1,3 +1,4 @@
+import { Script } from 'vm';
 import { bin2num, bsv, num2bin } from './utils';
 
 const Script = bsv.Script;
@@ -65,7 +66,7 @@ function serialize(x: boolean | number | bigint | string) {
 }
 
 // serialize contract state into Script ASM
-export function serializeState(state: State | StateArray, stateBytes: number = STATE_LEN_2BYTES, schema: State | StateArray = undefined ): string {
+export function serializeToASM(state: State | StateArray, schema: State | StateArray = undefined ): string {
   const asms = [];
 
   const keys = Object.keys(state);
@@ -79,13 +80,17 @@ export function serializeState(state: State | StateArray, stateBytes: number = S
     }
   }
 
-  const script = Script.fromASM(asms.join(' '));
-  const scriptHex = script.toHex();
+  return asms.join(' ');
+}
+// serialize contract state into Script ASM with length
+export function serializeState(state: State | StateArray, stateBytes: number = STATE_LEN_2BYTES, schema: State | StateArray = undefined ): string {
+  const scriptASM = serializeToASM(state, schema);
+  const scriptHex = Script.fromASM(scriptASM).toHex();
   const stateLen = scriptHex.length / 2;
 
   // use fixed size to denote state len
   const len = num2bin(stateLen, stateBytes);
-  return script.toASM() + ' ' + len;
+  return scriptASM + ' ' + len;
 }
 
 class OpState {
