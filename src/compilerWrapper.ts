@@ -1,22 +1,44 @@
 import { basename, dirname, join } from 'path';
 import { execSync } from 'child_process';
-import { readFileSync, writeFileSync, unlinkSync, existsSync, renameSync, readdirSync } from 'fs';
+import {
+  readFileSync,
+  writeFileSync,
+  unlinkSync,
+  existsSync,
+  renameSync,
+  readdirSync,
+} from 'fs';
 import { oc } from 'ts-optchain';
 import { ContractDescription } from './contract';
 import * as os from 'os';
 import md5 = require('md5');
-import { path2uri, isArrayType, arrayTypeAndSizeStr, toLiteralArrayType, resolveType, isStructType, getStructNameByType, arrayTypeAndSize } from './utils';
+import {
+  path2uri,
+  isArrayType,
+  arrayTypeAndSizeStr,
+  toLiteralArrayType,
+  resolveType,
+  isStructType,
+  getStructNameByType,
+  arrayTypeAndSize,
+} from './utils';
 import compareVersions = require('compare-versions');
 import JSONbig = require('json-bigint');
-const SYNTAX_ERR_REG = /(?<filePath>[^\s]+):(?<line>\d+):(?<column>\d+):\n([^\n]+\n){3}(unexpected (?<unexpected>[^\n]+)\nexpecting (?<expecting>[^\n]+)|(?<message>[^\n]+))/g;
-const SEMANTIC_ERR_REG = /Error:(\s|\n)*(?<filePath>[^\s]+):(?<line>\d+):(?<column>\d+):(?<line1>\d+):(?<column1>\d+):*\n(?<message>[^\n]+)\n/g;
+const SYNTAX_ERR_REG =
+  /(?<filePath>[^\s]+):(?<line>\d+):(?<column>\d+):\n([^\n]+\n){3}(unexpected (?<unexpected>[^\n]+)\nexpecting (?<expecting>[^\n]+)|(?<message>[^\n]+))/g;
+const SEMANTIC_ERR_REG =
+  /Error:(\s|\n)*(?<filePath>[^\s]+):(?<line>\d+):(?<column>\d+):(?<line1>\d+):(?<column1>\d+):*\n(?<message>[^\n]+)\n/g;
 const INTERNAL_ERR_REG = /Internal error:(?<message>.+)/;
-const WARNING_REG = /Warning:(\s|\n)*(?<filePath>[^\s]+):(?<line>\d+):(?<column>\d+):(?<line1>\d+):(?<column1>\d+):*\n(?<message>[^\n]+)\n/g;
-const JSONbigAlways = JSONbig({ alwaysParseAsBig: true, constructorAction: 'preserve' });
-
+const WARNING_REG =
+  /Warning:(\s|\n)*(?<filePath>[^\s]+):(?<line>\d+):(?<column>\d+):(?<line1>\d+):(?<column1>\d+):*\n(?<message>[^\n]+)\n/g;
+const JSONbigAlways = JSONbig({
+  alwaysParseAsBig: true,
+  constructorAction: 'preserve',
+});
 
 //SOURCE_REG parser src eg: [0:6:3:8:4#Bar.constructor:0]
-const SOURCE_REG = /^(?<fileIndex>-?\d+):(?<line>\d+):(?<col>\d+):(?<endLine>\d+):(?<endCol>\d+)(#(?<tagStr>.+))?/;
+const SOURCE_REG =
+  /^(?<fileIndex>-?\d+):(?<line>\d+):(?<col>\d+):(?<endLine>\d+):(?<endCol>\d+)(#(?<tagStr>.+))?/;
 
 // see VERSIONLOG.md
 const CURRENT_CONTRACT_DESCRIPTION_VERSION = 3;
@@ -24,19 +46,22 @@ export enum CompileErrorType {
   SyntaxError = 'SyntaxError',
   SemanticError = 'SemanticError',
   InternalError = 'InternalError',
-  Warning = 'Warning'
+  Warning = 'Warning',
 }
 
 export interface CompileErrorBase {
   type: string;
   filePath: string;
-  position: [{
-    line: number;
-    column: number;
-  }, {
-    line: number;
-    column: number;
-  }?];
+  position: [
+    {
+      line: number;
+      column: number;
+    },
+    {
+      line: number;
+      column: number;
+    }?
+  ];
   message: string;
 }
 
@@ -58,7 +83,11 @@ export interface Warning extends CompileErrorBase {
   type: CompileErrorType.Warning;
 }
 
-export type CompileError = SyntaxError | SemanticError | InternalError | Warning;
+export type CompileError =
+  | SyntaxError
+  | SemanticError
+  | InternalError
+  | Warning;
 
 export interface CompileResult {
   asm?: OpCode[];
@@ -79,9 +108,8 @@ export interface CompileResult {
 export enum DebugModeTag {
   FuncStart = 'F0',
   FuncEnd = 'F1',
-  LoopStart = 'L0'
+  LoopStart = 'L0',
 }
-
 
 export interface Pos {
   file: string;
@@ -105,17 +133,18 @@ export interface AutoTypedVar {
 }
 
 export interface ABI {
-  contract: string, abi: Array<ABIEntity>
+  contract: string;
+  abi: Array<ABIEntity>;
 }
 
 export enum ABIEntityType {
   FUNCTION = 'function',
-  CONSTRUCTOR = 'constructor'
+  CONSTRUCTOR = 'constructor',
 }
 export type ParamEntity = {
   name: string;
   type: string;
-}
+};
 export interface ABIEntity {
   type: ABIEntityType;
   name?: string;
@@ -135,24 +164,24 @@ export interface AliasEntity {
 
 export function compile(
   source: {
-    path: string,
-    content?: string,
+    path: string;
+    content?: string;
   },
   settings: {
-    npxArgs?: string,
-    scVersion?: string,
-    ast?: boolean,
-    asm?: boolean,
-    debug?: boolean,
-    desc?: boolean,
-    outputDir?: string,
-    outputToFiles?: boolean,
-    cwd?: string,
-    cmdPrefix?: string,
-    cmdArgs?: string,
-    sourceMap?: boolean,
-    optimize?: boolean,
-    timeout?: number  // in ms
+    npxArgs?: string;
+    scVersion?: string;
+    ast?: boolean;
+    asm?: boolean;
+    debug?: boolean;
+    desc?: boolean;
+    outputDir?: string;
+    outputToFiles?: boolean;
+    cwd?: string;
+    cmdPrefix?: string;
+    cmdArgs?: string;
+    sourceMap?: boolean;
+    optimize?: boolean;
+    timeout?: number; // in ms
   } = {
     asm: true,
     debug: true,
@@ -168,10 +197,23 @@ export function compile(
   const timeout = settings.timeout || 1200000;
   const outputFiles = {};
   try {
-    const sourceContent = source.content !== undefined ? source.content : readFileSync(sourcePath, 'utf8');
+    const sourceContent =
+      source.content !== undefined
+        ? source.content
+        : readFileSync(sourcePath, 'utf8');
     const cmdPrefix = settings.cmdPrefix || getDefaultScryptc();
-    const cmd = `${cmdPrefix} compile ${settings.asm || settings.desc ? '--asm' : ''} ${settings.ast || settings.desc ? '--ast' : ''} ${settings.debug == false ? '' : '--debug'} ${settings.optimize ? '--opt' : ''} -r -o "${outputDir}" ${settings.cmdArgs ? settings.cmdArgs : ''}`;
-    let output = execSync(cmd, { input: sourceContent, cwd: curWorkingDir, timeout }).toString();
+    const cmd = `${cmdPrefix} compile ${
+      settings.asm || settings.desc ? '--asm' : ''
+    } ${settings.ast || settings.desc ? '--ast' : ''} ${
+      settings.debug == false ? '' : '--debug'
+    } ${settings.optimize ? '--opt' : ''} -r -o "${outputDir}" ${
+      settings.cmdArgs ? settings.cmdArgs : ''
+    }`;
+    let output = execSync(cmd, {
+      input: sourceContent,
+      cwd: curWorkingDir,
+      timeout,
+    }).toString();
     // Because the output of the compiler on the win32 platform uses crlf as a newline， here we change \r\n to \n. make SYNTAX_ERR_REG、SEMANTIC_ERR_REG、IMPORT_ERR_REG work.
     output = output.split(/\r?\n/g).join('\n');
     let result: CompileResult = { errors: [], warnings: [] };
@@ -181,17 +223,17 @@ export function compile(
       if (result.errors.length > 0) {
         return result;
       }
-
     }
-
-
 
     if (settings.ast || settings.desc) {
       const outputFilePath = getOutputFilePath(outputDir, 'ast');
       outputFiles['ast'] = outputFilePath;
 
-
-      const allAst = addSourceLocation(JSONbigAlways.parse(readFileSync(outputFilePath, 'utf8')), srcDir, sourceFileName);
+      const allAst = addSourceLocation(
+        JSONbigAlways.parse(readFileSync(outputFilePath, 'utf8')),
+        srcDir,
+        sourceFileName
+      );
 
       const sourceUri = path2uri(sourcePath);
       result.file = sourceUri;
@@ -201,12 +243,15 @@ export function compile(
       result.alias = getAliasDeclaration(result.ast, allAst);
 
       const staticConstInt = getStaticConstIntDeclaration(result.ast, allAst);
-      const { contract: name, abi } = getABIDeclaration(result.ast, result.alias, staticConstInt);
+      const { contract: name, abi } = getABIDeclaration(
+        result.ast,
+        result.alias,
+        staticConstInt
+      );
 
       result.abi = abi;
       result.contract = name;
       result.structs = getStructDeclaration(result.ast, allAst);
-
     }
 
     let asmObj = null;
@@ -217,11 +262,10 @@ export function compile(
 
       asmObj = JSON.parse(readFileSync(outputFilePath, 'utf8'));
       const sources = asmObj.sources;
-      result.asm = asmObj.output.map(item => {
-
+      result.asm = asmObj.output.map((item) => {
         if (!settings.debug) {
           return {
-            opcode: item.opcode
+            opcode: item.opcode,
           };
         }
 
@@ -243,42 +287,52 @@ export function compile(
             debugTag = DebugModeTag.LoopStart;
           }
 
-          const pos: Pos | undefined = sources[fileIndex] ? {
-            file: sources[fileIndex] ? getFullFilePath(sources[fileIndex], srcDir, sourceFileName) : undefined,
-            line: sources[fileIndex] ? parseInt(match.groups.line) : undefined,
-            endLine: sources[fileIndex] ? parseInt(match.groups.endLine) : undefined,
-            column: sources[fileIndex] ? parseInt(match.groups.col) : undefined,
-            endColumn: sources[fileIndex] ? parseInt(match.groups.endCol) : undefined,
-          } : undefined;
+          let pos: Pos;
+          if (sources[fileIndex]) {
+            pos = {
+              file: getFullFilePath(sources[fileIndex], srcDir, sourceFileName),
+              line: parseInt(match.groups.line),
+              endLine: parseInt(match.groups.endLine),
+              column: parseInt(match.groups.col),
+              endColumn: parseInt(match.groups.endCol),
+            };
+          }
 
           return {
             opcode: item.opcode,
             stack: item.stack,
             pos: pos,
-            debugTag
+            debugTag,
           };
         }
         throw new Error('Compile Failed: Asm output parsing Error!');
       });
 
-
       if (settings.debug) {
-        result.autoTypedVars = asmObj.autoTypedVars.map(item => {
+        result.autoTypedVars = asmObj.autoTypedVars.map((item) => {
           const match = SOURCE_REG.exec(item.src);
           if (match && match.groups) {
             const fileIndex = parseInt(match.groups.fileIndex);
 
-            const pos: Pos | undefined = sources[fileIndex] ? {
-              file: sources[fileIndex] ? getFullFilePath(sources[fileIndex], srcDir, sourceFileName) : undefined,
-              line: sources[fileIndex] ? parseInt(match.groups.line) : undefined,
-              endLine: sources[fileIndex] ? parseInt(match.groups.endLine) : undefined,
-              column: sources[fileIndex] ? parseInt(match.groups.col) : undefined,
-              endColumn: sources[fileIndex] ? parseInt(match.groups.endCol) : undefined,
-            } : undefined;
+            let pos: Pos;
+            if (sources[fileIndex]) {
+              pos = {
+                file: getFullFilePath(
+                  sources[fileIndex],
+                  srcDir,
+                  sourceFileName
+                ),
+                line: parseInt(match.groups.line),
+                endLine: parseInt(match.groups.endLine),
+                column: parseInt(match.groups.col),
+                endColumn: parseInt(match.groups.endCol),
+              };
+            }
+
             return {
               name: item.name,
               type: item.type,
-              pos: pos
+              pos: pos,
             };
           }
         });
@@ -291,23 +345,27 @@ export function compile(
       outputFiles['desc'] = outputFilePath;
       const description: ContractDescription = {
         version: CURRENT_CONTRACT_DESCRIPTION_VERSION,
-        compilerVersion: compilerVersion(settings.cmdPrefix ? settings.cmdPrefix : getDefaultScryptc()),
+        compilerVersion: compilerVersion(
+          settings.cmdPrefix ? settings.cmdPrefix : getDefaultScryptc()
+        ),
         contract: result.contract,
         md5: md5(sourceContent),
         structs: result.structs || [],
         alias: result.alias || [],
         abi: result.abi || [],
         file: '',
-        asm: result.asm.map(item => item['opcode'].trim()).join(' '),
+        asm: result.asm.map((item) => item['opcode'].trim()).join(' '),
         sources: [],
-        sourceMap: []
+        sourceMap: [],
       };
 
       if (settings.debug && settings.sourceMap && asmObj) {
         Object.assign(description, {
           file: result.file,
-          sources: asmObj.sources.map(source => getFullFilePath(source, srcDir, sourceFileName)),
-          sourceMap: asmObj.output.map(item => item.src),
+          sources: asmObj.sources.map((source) =>
+            getFullFilePath(source, srcDir, sourceFileName)
+          ),
+          sourceMap: asmObj.output.map((item) => item.src),
         });
       }
       writeFileSync(outputFilePath, JSON.stringify(description, null, 4));
@@ -319,12 +377,15 @@ export function compile(
     return result;
   } finally {
     if (settings.outputToFiles) {
-      Object.keys(outputFiles).forEach(outputType => {
+      Object.keys(outputFiles).forEach((outputType) => {
         const file = outputFiles[outputType];
         if (existsSync(file)) {
           if (settings[outputType]) {
             // rename all output files
-            renameSync(file, file.replace('stdin', basename(sourcePath, '.scrypt')));
+            renameSync(
+              file,
+              file.replace('stdin', basename(sourcePath, '.scrypt'))
+            );
           } else {
             unlinkSync(file);
           }
@@ -332,7 +393,7 @@ export function compile(
       });
     } else {
       // cleanup all output files
-      Object.values<string>(outputFiles).forEach(file => {
+      Object.values<string>(outputFiles).forEach((file) => {
         if (existsSync(file)) {
           unlinkSync(file);
         }
@@ -362,8 +423,9 @@ function addSourceLocation(astRoot, basePath: string, curFileName: string) {
 }
 
 function _addSourceLocationProperty(astObj, uri: string | null) {
-
-  if (!(typeof astObj === 'object')) { return astObj; }
+  if (!(typeof astObj === 'object')) {
+    return astObj;
+  }
   for (const field in astObj) {
     const value = astObj[field];
     if (field === 'src') {
@@ -374,7 +436,7 @@ function _addSourceLocationProperty(astObj, uri: string | null) {
         astObj.loc = {
           source: uri,
           start: { line: parseInt(matches[1]), column: parseInt(matches[2]) },
-          end: { line: parseInt(matches[3]), column: parseInt(matches[4]) }
+          end: { line: parseInt(matches[3]), column: parseInt(matches[4]) },
         };
       }
       delete astObj['src'];
@@ -386,17 +448,24 @@ function _addSourceLocationProperty(astObj, uri: string | null) {
   return astObj;
 }
 
-function getOutputFilePath(baseDir: string, target: 'ast' | 'asm' | 'desc'): string {
+function getOutputFilePath(
+  baseDir: string,
+  target: 'ast' | 'asm' | 'desc'
+): string {
   return join(baseDir, `stdin_${target}.json`);
 }
 
-function getFullFilePath(relativePath: string, baseDir: string, curFileName: string): string {
+function getFullFilePath(
+  relativePath: string,
+  baseDir: string,
+  curFileName: string
+): string {
   if (relativePath.endsWith('stdin')) {
     return join(baseDir, curFileName); // replace 'stdin' with real current compiling file name.
   }
 
   if (relativePath === 'std') {
-    return 'std'; // 
+    return 'std'; //
   }
 
   return join(baseDir, relativePath);
@@ -407,14 +476,18 @@ function getConstructorDeclaration(mainContract): ABIEntity {
   if (mainContract['constructor']) {
     return {
       type: ABIEntityType.CONSTRUCTOR,
-      params: mainContract['constructor']['params'].map(p => { return { name: p['name'], type: p['type'] }; }),
+      params: mainContract['constructor']['params'].map((p) => {
+        return { name: p['name'], type: p['type'] };
+      }),
     };
   } else {
     // implicit constructor
     if (mainContract['properties']) {
       return {
         type: ABIEntityType.CONSTRUCTOR,
-        params: mainContract['properties'].map(p => { return { name: p['name'].replace('this.', ''), type: p['type'] }; }),
+        params: mainContract['properties'].map((p) => {
+          return { name: p['name'].replace('this.', ''), type: p['type'] };
+        }),
       };
     }
   }
@@ -422,29 +495,32 @@ function getConstructorDeclaration(mainContract): ABIEntity {
 
 function getPublicFunctionDeclaration(mainContract): ABIEntity[] {
   let pubIndex = 0;
-  const interfaces: ABIEntity[] =
-    mainContract['functions']
-      .filter(f => f['visibility'] === 'Public')
-      .map(f => {
-        const entity: ABIEntity = {
-          type: ABIEntityType.FUNCTION,
-          name: f['name'],
-          index: f['nodeType'] === 'Constructor' ? undefined : pubIndex++,
-          params: f['params'].map(p => { return { name: p['name'], type: p['type'] }; }),
-        };
-        return entity;
-      });
+  const interfaces: ABIEntity[] = mainContract['functions']
+    .filter((f) => f['visibility'] === 'Public')
+    .map((f) => {
+      const entity: ABIEntity = {
+        type: ABIEntityType.FUNCTION,
+        name: f['name'],
+        index: f['nodeType'] === 'Constructor' ? undefined : pubIndex++,
+        params: f['params'].map((p) => {
+          return { name: p['name'], type: p['type'] };
+        }),
+      };
+      return entity;
+    });
   return interfaces;
 }
 
-
-
-export function getABIDeclaration(astRoot, alias: AliasEntity[], staticConstInt: Record<string, number>): ABI {
+export function getABIDeclaration(
+  astRoot,
+  alias: AliasEntity[],
+  staticConstInt: Record<string, number>
+): ABI {
   const mainContract = astRoot['contracts'][astRoot['contracts'].length - 1];
   if (!mainContract) {
     return {
       contract: '',
-      abi: []
+      abi: [],
     };
   }
 
@@ -453,42 +529,60 @@ export function getABIDeclaration(astRoot, alias: AliasEntity[], staticConstInt:
 
   interfaces.push(constructorABI);
 
-  interfaces.forEach(abi => {
-    abi.params = abi.params.map(param => {
+  interfaces.forEach((abi) => {
+    abi.params = abi.params.map((param) => {
       return Object.assign(param, {
-        type: resolveAbiParamType(mainContract['name'], param.type, alias, staticConstInt)
+        type: resolveAbiParamType(
+          mainContract['name'],
+          param.type,
+          alias,
+          staticConstInt
+        ),
       });
     });
   });
 
   return {
     contract: mainContract['name'],
-    abi: interfaces
+    abi: interfaces,
   };
 }
 
-
-function resolveAbiParamType(contract: string, type: string, alias: AliasEntity[], staticConstInt: Record<string, number>): string {
-  const resolvedConstIntType = resolveArrayTypeWithConstInt(contract, type, staticConstInt);
+function resolveAbiParamType(
+  contract: string,
+  type: string,
+  alias: AliasEntity[],
+  staticConstInt: Record<string, number>
+): string {
+  const resolvedConstIntType = resolveArrayTypeWithConstInt(
+    contract,
+    type,
+    staticConstInt
+  );
   const resolvedAliasType = resolveType(alias, resolvedConstIntType);
 
   if (isStructType(resolvedAliasType)) {
     return getStructNameByType(resolvedAliasType);
   } else if (isArrayType(resolvedAliasType)) {
     const [elemTypeName, arraySizes] = arrayTypeAndSize(resolvedAliasType);
-    const elemType = isStructType(elemTypeName) ? getStructNameByType(elemTypeName) : elemTypeName;
+    const elemType = isStructType(elemTypeName)
+      ? getStructNameByType(elemTypeName)
+      : elemTypeName;
     return toLiteralArrayType(elemType, arraySizes);
   }
 
   return resolvedAliasType;
 }
 
-export function resolveArrayTypeWithConstInt(contract: string, type: string, staticConstInt: Record<string, number>): string {
-
+export function resolveArrayTypeWithConstInt(
+  contract: string,
+  type: string,
+  staticConstInt: Record<string, number>
+): string {
   if (isArrayType(type)) {
     const [elemTypeName, arraySizes] = arrayTypeAndSizeStr(type);
 
-    const sizes = arraySizes.map(size => {
+    const sizes = arraySizes.map((size) => {
       if (/^(\d)+$/.test(size)) {
         return parseInt(size);
       } else {
@@ -505,74 +599,94 @@ export function resolveArrayTypeWithConstInt(contract: string, type: string, sta
   return type;
 }
 
-
-export function getStructDeclaration(astRoot, dependencyAsts): Array<StructEntity> {
-
-
+export function getStructDeclaration(
+  astRoot,
+  dependencyAsts
+): Array<StructEntity> {
   const allAst = [astRoot];
 
-  Object.keys(dependencyAsts).forEach(key => {
+  Object.keys(dependencyAsts).forEach((key) => {
     allAst.push(dependencyAsts[key]);
   });
 
-  return allAst.map(ast => {
-    return oc(ast).structs([]).map(s => ({
-      name: s['name'],
-      params: s['fields'].map(p => { return { name: p['name'], type: p['type'] }; }),
-    }));
-  }).flat(1);
+  return allAst
+    .map((ast) => {
+      return oc(ast)
+        .structs([])
+        .map((s) => ({
+          name: s['name'],
+          params: s['fields'].map((p) => {
+            return { name: p['name'], type: p['type'] };
+          }),
+        }));
+    })
+    .flat(1);
 }
 
-
-export function getAliasDeclaration(astRoot, dependencyAsts): Array<AliasEntity> {
-
+export function getAliasDeclaration(
+  astRoot,
+  dependencyAsts
+): Array<AliasEntity> {
   const allAst = [astRoot];
 
-  Object.keys(dependencyAsts).forEach(key => {
+  Object.keys(dependencyAsts).forEach((key) => {
     allAst.push(dependencyAsts[key]);
   });
 
-  return allAst.map(ast => {
-    return oc(ast).alias([]).map(s => ({
-      name: s['alias'],
-      type: s['type'],
-    }));
-  }).flat(1);
+  return allAst
+    .map((ast) => {
+      return oc(ast)
+        .alias([])
+        .map((s) => ({
+          name: s['alias'],
+          type: s['type'],
+        }));
+    })
+    .flat(1);
 }
 
-export function getStaticConstIntDeclaration(astRoot, dependencyAsts): Record<string, number> {
-
+export function getStaticConstIntDeclaration(
+  astRoot,
+  dependencyAsts
+): Record<string, number> {
   const allAst = [astRoot];
-  Object.keys(dependencyAsts).forEach(key => {
+  Object.keys(dependencyAsts).forEach((key) => {
     allAst.push(dependencyAsts[key]);
   });
 
-  return allAst.map((ast, index) => {
-    return oc(ast).contracts([]).map(contract => {
-      return oc(contract).statics([]).filter(s => (
-        s.const === true && s.expr.nodeType === 'IntLiteral'
-      )).map(s => {
-
-        return {
-          name: `${contract.name}.${s.name}`,
-          value: s.expr.value
-        };
-      });
-    });
-  }).flat(Infinity).reduce((acc, item) => (acc[item.name] = item.value, acc), {} as Record<string, number>);
+  return allAst
+    .map((ast, index) => {
+      return oc(ast)
+        .contracts([])
+        .map((contract) => {
+          return oc(contract)
+            .statics([])
+            .filter((s) => s.const === true && s.expr.nodeType === 'IntLiteral')
+            .map((s) => {
+              return {
+                name: `${contract.name}.${s.name}`,
+                value: s.expr.value,
+              };
+            });
+        });
+    })
+    .flat(Infinity)
+    .reduce(
+      (acc, item) => ((acc[item.name] = item.value), acc),
+      {} as Record<string, number>
+    );
 }
-
 
 export function getPlatformScryptc(): string {
   switch (os.platform()) {
-  case 'win32':
-    return 'compiler/scryptc/win32/scryptc.exe';
-  case 'linux':
-    return 'compiler/scryptc/linux/scryptc';
-  case 'darwin':
-    return 'compiler/scryptc/mac/scryptc';
-  default:
-    throw `sCrypt doesn't support ${os.platform()}`;
+    case 'win32':
+      return 'compiler/scryptc/win32/scryptc.exe';
+    case 'linux':
+      return 'compiler/scryptc/linux/scryptc';
+    case 'darwin':
+      return 'compiler/scryptc/mac/scryptc';
+    default:
+      throw `sCrypt doesn't support ${os.platform()}`;
   }
 }
 
@@ -603,8 +717,6 @@ function findVscodeScrypt(extensionPath: string): string {
 }
 
 export function getDefaultScryptc(): string {
-
-
   const extensionPath = vscodeExtensionPath();
 
   const sCrypt = findVscodeScrypt(extensionPath);
@@ -622,12 +734,13 @@ export function getDefaultScryptc(): string {
   return scryptc;
 }
 
-
-
-export function desc2CompileResult(description: ContractDescription): CompileResult {
+export function desc2CompileResult(
+  description: ContractDescription
+): CompileResult {
   const sources = description.sources;
   const asm = description.asm.split(' ');
-  const errorMessage = 'Contract description version deprecated,  Please update your sCrypt extension to the latest version and recompile';
+  const errorMessage =
+    'Contract description version deprecated,  Please update your sCrypt extension to the latest version and recompile';
   if (description.version === undefined) {
     throw new Error(errorMessage);
   }
@@ -653,116 +766,152 @@ export function desc2CompileResult(description: ContractDescription): CompileRes
         if (match && match.groups) {
           const fileIndex = parseInt(match.groups.fileIndex);
 
-          const pos: Pos | undefined = sources[fileIndex] ? {
-            file: sources[fileIndex],
-            line: sources[fileIndex] ? parseInt(match.groups.line) : undefined,
-            endLine: sources[fileIndex] ? parseInt(match.groups.endLine) : undefined,
-            column: sources[fileIndex] ? parseInt(match.groups.col) : undefined,
-            endColumn: sources[fileIndex] ? parseInt(match.groups.endCol) : undefined,
-          } : undefined;
+          const pos: Pos | undefined = sources[fileIndex]
+            ? {
+                file: sources[fileIndex],
+                line: sources[fileIndex]
+                  ? parseInt(match.groups.line)
+                  : undefined,
+                endLine: sources[fileIndex]
+                  ? parseInt(match.groups.endLine)
+                  : undefined,
+                column: sources[fileIndex]
+                  ? parseInt(match.groups.col)
+                  : undefined,
+                endColumn: sources[fileIndex]
+                  ? parseInt(match.groups.endCol)
+                  : undefined,
+              }
+            : undefined;
 
           return {
             pos: pos,
             opcode: opcode,
-            stack: []
+            stack: [],
           };
         }
       }
 
       return {
         opcode: opcode,
-        stack: []
+        stack: [],
       };
-    })
+    }),
   };
   return result;
 }
 
-function getErrorsAndWarnings(output: string, srcDir: string, sourceFileName: string): CompileResult {
-  const warnings: Warning[] = [...output.matchAll(WARNING_REG)].map(match => {
+function getErrorsAndWarnings(
+  output: string,
+  srcDir: string,
+  sourceFileName: string
+): CompileResult {
+  const warnings: Warning[] = [...output.matchAll(WARNING_REG)].map((match) => {
     const filePath = oc(match.groups).filePath('');
     let message = oc(match.groups).message('');
 
-    message = message.replace(/Variable `(?<varName>\w+)` shadows existing binding at (?<fileIndex>[^\s]+):(?<line>\d+):(?<column>\d+):(?<line1>\d+):(?<column1>\d+)/,
-      'Variable `$1` shadows existing binding at $3:$4:$5:$6');
+    message = message.replace(
+      /Variable `(?<varName>\w+)` shadows existing binding at (?<fileIndex>[^\s]+):(?<line>\d+):(?<column>\d+):(?<line1>\d+):(?<column1>\d+)/,
+      'Variable `$1` shadows existing binding at $3:$4:$5:$6'
+    );
     return {
       type: CompileErrorType.Warning,
       filePath: getFullFilePath(filePath, srcDir, sourceFileName),
-      position: [{
-        line: parseInt(oc(match.groups).line('-1')),
-        column: parseInt(oc(match.groups).column('-1')),
-      }, {
-        line: parseInt(oc(match.groups).line1('-1')),
-        column: parseInt(oc(match.groups).column1('-1')),
-      }],
-      message: message
+      position: [
+        {
+          line: parseInt(oc(match.groups).line('-1')),
+          column: parseInt(oc(match.groups).column('-1')),
+        },
+        {
+          line: parseInt(oc(match.groups).line1('-1')),
+          column: parseInt(oc(match.groups).column1('-1')),
+        },
+      ],
+      message: message,
     };
   });
-
 
   if (output.match(INTERNAL_ERR_REG)) {
     return {
       warnings: warnings,
-      errors: [{
-        type: CompileErrorType.InternalError,
-        filePath: getFullFilePath('stdin', srcDir, sourceFileName),
-        message: `Compiler internal error: ${oc(output.match(INTERNAL_ERR_REG).groups).message('')}`,
-        position: [{
-          line: 1,
-          column: 1
-        }, {
-          line: 1,
-          column: 1
-        }]
-      }]
+      errors: [
+        {
+          type: CompileErrorType.InternalError,
+          filePath: getFullFilePath('stdin', srcDir, sourceFileName),
+          message: `Compiler internal error: ${oc(
+            output.match(INTERNAL_ERR_REG).groups
+          ).message('')}`,
+          position: [
+            {
+              line: 1,
+              column: 1,
+            },
+            {
+              line: 1,
+              column: 1,
+            },
+          ],
+        },
+      ],
     };
   } else if (output.includes('Syntax error:')) {
-    const syntaxErrors: CompileError[] = [...output.matchAll(SYNTAX_ERR_REG)].map(match => {
+    const syntaxErrors: CompileError[] = [
+      ...output.matchAll(SYNTAX_ERR_REG),
+    ].map((match) => {
       const filePath = oc(match.groups).filePath('');
       const unexpected = oc(match.groups).unexpected('');
       const expecting = oc(match.groups).expecting('');
       return {
         type: CompileErrorType.SyntaxError,
         filePath: getFullFilePath(filePath, srcDir, sourceFileName),
-        position: [{
-          line: parseInt(oc(match.groups).line('-1')),
-          column: parseInt(oc(match.groups).column('-1')),
-        }],
-        message: oc(match.groups).message(`unexpected ${unexpected}\nexpecting ${expecting}`),
+        position: [
+          {
+            line: parseInt(oc(match.groups).line('-1')),
+            column: parseInt(oc(match.groups).column('-1')),
+          },
+        ],
+        message: oc(match.groups).message(
+          `unexpected ${unexpected}\nexpecting ${expecting}`
+        ),
         unexpected,
         expecting,
       };
     });
     return {
       warnings: warnings,
-      errors: syntaxErrors
+      errors: syntaxErrors,
     };
-  }
-  else {
-
-    const semanticErrors: CompileError[] = [...output.matchAll(SEMANTIC_ERR_REG)].map(match => {
+  } else {
+    const semanticErrors: CompileError[] = [
+      ...output.matchAll(SEMANTIC_ERR_REG),
+    ].map((match) => {
       let message = oc(match.groups).message('');
       const filePath = oc(match.groups).filePath('');
 
-      message = message.replace(/Symbol `(?<varName>\w+)` already defined at (?<fileIndex>[^\s]+):(?<line>\d+):(?<column>\d+):(?<line1>\d+):(?<column1>\d+)/,
-        'Symbol `$1` already defined at $3:$4:$5:$6');
+      message = message.replace(
+        /Symbol `(?<varName>\w+)` already defined at (?<fileIndex>[^\s]+):(?<line>\d+):(?<column>\d+):(?<line1>\d+):(?<column1>\d+)/,
+        'Symbol `$1` already defined at $3:$4:$5:$6'
+      );
 
       return {
         type: CompileErrorType.SemanticError,
         filePath: getFullFilePath(filePath, srcDir, sourceFileName),
-        position: [{
-          line: parseInt(oc(match.groups).line('-1')),
-          column: parseInt(oc(match.groups).column('-1')),
-        }, {
-          line: parseInt(oc(match.groups).line1('-1')),
-          column: parseInt(oc(match.groups).column1('-1')),
-        }],
-        message: message
+        position: [
+          {
+            line: parseInt(oc(match.groups).line('-1')),
+            column: parseInt(oc(match.groups).column('-1')),
+          },
+          {
+            line: parseInt(oc(match.groups).line1('-1')),
+            column: parseInt(oc(match.groups).column1('-1')),
+          },
+        ],
+        message: message,
       };
     });
     return {
       warnings: warnings,
-      errors: semanticErrors
+      errors: semanticErrors,
     };
   }
 }

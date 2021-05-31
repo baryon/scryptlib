@@ -12,13 +12,14 @@
     "fs": false
   },
   "scripts": {
-    "compile": "tsc -b",
-    "watch": "tsc -b -w",
-    "lint": "eslint src --ext .ts,.js --cache --fix",
-    "testlint": "eslint src --ext .ts,.js",
-    "test": "mocha -r ts-node/register test/**/*.test.ts --timeout 600000 --debugUri",
-    "pretest": "ts-node test/fixture/autoCompile.ts",
-    "prepare": "husky install && npm run compile",
+    "compile": "npx tsc -b",
+    "watch": "npx tsc -b -w",
+    "lint": "npx eslint src --ext .ts,.js --cache --fix",
+    "testlint": "npx eslint src --ext .ts,.js",
+    "singletest": "npx mocha -r ts-node/register ",
+    "test": "npx mocha -r ts-node/register test/**/*.test.ts --timeout 600000 --debugUri",
+    "pretest": "npx ts-node test/fixture/autoCompile.ts",
+    "prepare": "npx husky install && npm run compile",
     "publishcheck": "sh ./publishcheck.sh",
     "prepublishOnly": "npm run publishcheck && npm run lint && npm run compile"
   },
@@ -39,6 +40,7 @@
   },
   "homepage": "https://github.com/scrypt-sv/scryptlib#readme",
   "devDependencies": {
+    "@types/bn.js": "^5.1.0",
     "@types/chai": "^4.2.7",
     "@types/mocha": "^5.2.7",
     "@types/node": "^13.1.2",
@@ -49,6 +51,7 @@
     "eslint": "^7.2.0",
     "husky": "^5.2.0",
     "mocha": "^6.2.2",
+    "reify": "^0.20.12",
     "ts-loader": "^6.2.1",
     "ts-node": "^8.6.2",
     "typescript": "^3.9.5",
@@ -56,10 +59,13 @@
     "webpack-cli": "^3.3.11"
   },
   "dependencies": {
-    "bsv": "git+https://git@github.com/scrypt-sv/bsv.git#07f0d3c688a979d0b5d5cfe5e96c53f52fce6d58",
+    "bsv": "git+https://git@github.com/baryon/bsv.git#bsv-legacy",
     "compare-versions": "^3.6.0",
     "json-bigint": "^1.0.0",
     "md5": "^2.2.1",
     "ts-optchain": "^0.1.8"
-  }
+  },
+  "eslintIgnore": [
+    "/.eslintrc.js"
+  ]
 }

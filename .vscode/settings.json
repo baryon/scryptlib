@@ -6,5 +6,8 @@
     "eslint.validate": [
         "typescript",
         "javascript"
+    ],
+    "favorites.resources": [
+      "node_modules/bsv"
     ]
 }
