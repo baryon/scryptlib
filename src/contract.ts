@@ -35,6 +35,8 @@ import {
   Pos,
 } from './compilerWrapper';
 
+import * as Interpreter from './interpreter';
+
 export interface TxContext {
   tx?: any;
   inputIndex?: number;
@@ -154,10 +156,10 @@ export class AbstractContract {
     const inputIndex = txCtx.inputIndex || 0;
     const inputSatoshis = txCtx.inputSatoshis || 0;
 
-    const bsi = new bsv.Script.Interpreter();
+    const bsi = new Interpreter();
 
     let stepCounter: StepIndex = 0;
-    const interpretStates: bsv.Script.Interpreter.InterpretState[] = [];
+    const interpretStates: any[] = [];
     bsi.stepListener = function (step: any, stack: any[], altstack: any[]) {
       interpretStates.push({
         mainstack: stack,
@@ -181,7 +183,7 @@ export class AbstractContract {
     let error = result ? '' : `VerifyError: ${bsi.errstr}`;
 
     // some time there is no opcodes, such as when sourcemap flag is closeed.
-    if (opcodes) {
+    if (!result && opcodes) {
       const offset = unlockingScriptASM.trim().split(' ').length;
       // the complete script may have op_return and data, but compiled output does not have it. So we need to make sure the index is in boundary.
 
@@ -190,61 +192,63 @@ export class AbstractContract {
         stepCounter
       );
 
-      if (typeof this._dataPart === 'string') {
-        opcodes.push({ opcode: 'OP_RETURN', stack: [] });
-        const dp = this._dataPart.trim();
-        if (dp) {
-          dp.split(' ').forEach((data) => {
-            opcodes.push({ opcode: data, stack: [] });
-          });
-        }
-      }
-
-      let opcodeIndex = lastStepIndex - offset;
-      if (stepCounter < opcodes.length + offset) {
-        // not all opcodes were executed, stopped in the middle at opcode like OP_VERIFY
-        opcodeIndex += 1;
-      }
-
-      if (!result && opcodes[opcodeIndex]) {
-        const opcode = opcodes[opcodeIndex];
-
-        if (!opcode.pos || opcode.pos.file === 'std') {
-          const srcInfo = AbstractContract.findSrcInfo(
-            interpretStates,
-            opcodes,
-            lastStepIndex,
-            opcodeIndex
-          );
-
-          if (srcInfo) {
-            opcode.pos = srcInfo.pos;
+      //have passed all opcodes, no last step index
+      if (lastStepIndex) {
+        if (typeof this._dataPart === 'string') {
+          opcodes.push({ opcode: 'OP_RETURN', stack: [] });
+          const dp = this._dataPart.trim();
+          if (dp) {
+            dp.split(' ').forEach((data) => {
+              opcodes.push({ opcode: data, stack: [] });
+            });
           }
         }
 
-        // in vscode termianal need to use [:] to jump to file line, but here need to use [#] to jump to file line in output channel.
-        if (opcode.pos) {
-          error = `VerifyError: ${bsi.errstr} \n\t[Go to Source](${path2uri(
-            opcode.pos.file
-          )}#${opcode.pos.line})  fails at ${opcode.opcode}\n`;
+        let opcodeIndex = lastStepIndex - offset;
+        if (stepCounter < opcodes.length + offset) {
+          // not all opcodes were executed, stopped in the middle at opcode like OP_VERIFY
+          opcodeIndex += 1;
+        }
 
-          if (
-            args &&
-            [
-              'OP_CHECKSIG',
-              'OP_CHECKSIGVERIFY',
-              'OP_CHECKMULTISIG',
-              'OP_CHECKMULTISIGVERIFY',
-            ].includes(opcode.opcode)
-          ) {
-            if (!txCtx) {
-              throw new Error('should provide txContext when verify');
-            }
-            if (!tx) {
-              throw new Error('should provide txContext.tx when verify');
+        if (!result && opcodes[opcodeIndex]) {
+          const opcode = opcodes[opcodeIndex];
+
+          if (!opcode.pos || opcode.pos.file === 'std') {
+            const srcInfo = AbstractContract.findSrcInfo(
+              interpretStates,
+              opcodes,
+              lastStepIndex,
+              opcodeIndex
+            );
+
+            if (srcInfo) {
+              opcode.pos = srcInfo.pos;
             }
           }
+
+          // in vscode termianal need to use [:] to jump to file line, but here need to use [#] to jump to file line in output channel.
+          if (opcode.pos) {
+            error = `VerifyError: ${bsi.errstr} \n\t[Go to Source](${path2uri(
+              opcode.pos.file
+            )}#${opcode.pos.line})  fails at ${opcode.opcode}\n`;
+            // if (
+            //   args &&
+            //   [
+            //     'OP_CHECKSIG',
+            //     'OP_CHECKSIGVERIFY',
+            //     'OP_CHECKMULTISIG',
+            //     'OP_CHECKMULTISIGVERIFY',
+            //   ].includes(opcode.opcode)
+            // ) {
+            // }
+          }
         }
+      }
+      if (!txCtx) {
+        error = error + 'should provide txContext when verify';
+      }
+      if (!tx) {
+        error = error + 'should provide txContext.tx when verify';
       }
     }
 

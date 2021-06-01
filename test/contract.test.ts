@@ -233,6 +233,7 @@ describe('buildContractClass()', () => {
         // emtpy txContext
         result = instance.run_verify(unlockingScriptASM);
         assert.isFalse(result.success, result.error);
+        assert.equal(result.error, 'should provide txContext.tx when verify');
 
         // incorrect inputSatoshis
         result = instance.run_verify(
